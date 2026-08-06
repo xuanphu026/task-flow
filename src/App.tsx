@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import confetti from 'canvas-confetti';
 import {
   calculateStats,
 } from './utils/storage';
@@ -21,6 +22,8 @@ import { Sidebar } from './components/Sidebar';
 import { QuickTaskInput } from './components/QuickTaskInput';
 import { TaskCard } from './components/TaskCard';
 import { TaskDetailModal } from './components/TaskDetailModal';
+import { TagManagerModal } from './components/TagManagerModal';
+import { ConfirmModal } from './components/ConfirmModal';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CalendarView } from './components/CalendarView';
 import { AnalyticsView } from './components/AnalyticsView';
@@ -47,6 +50,8 @@ export default function App() {
   });
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false);
+  const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   // Subscribe to real-time Firestore updates
@@ -54,7 +59,28 @@ export default function App() {
     setIsLoading(true);
     const unsubscribe = subscribeToTasks(
       (updatedTasks) => {
-        setTasks(updatedTasks);
+        // Auto-fix tasks where 100% of subtasks are completed but task.completed is false
+        const tasksWithUpdates = updatedTasks.map((t) => {
+          if (
+            !t.completed &&
+            t.subtasks &&
+            t.subtasks.length > 0 &&
+            t.subtasks.every((st) => st.completed)
+          ) {
+            const autoCompletedTask = {
+              ...t,
+              completed: true,
+              completedAt: t.completedAt || new Date().toISOString(),
+            };
+            saveTaskToFirestore(autoCompletedTask).catch((err) =>
+              console.error('Error auto-completing task in Firestore:', err)
+            );
+            return autoCompletedTask;
+          }
+          return t;
+        });
+
+        setTasks(tasksWithUpdates);
         setIsLoading(false);
       },
       (error) => {
@@ -100,10 +126,17 @@ export default function App() {
 
   // Task actions with Firebase Firestore
   const handleAddTask = async (newTaskData: Omit<Task, 'id' | 'createdAt'>) => {
+    const allDone =
+      newTaskData.subtasks &&
+      newTaskData.subtasks.length > 0 &&
+      newTaskData.subtasks.every((st) => st.completed);
+
     const newTask: Task = {
       ...newTaskData,
       id: `task-${Date.now()}`,
       createdAt: new Date().toISOString(),
+      completed: allDone ? true : newTaskData.completed,
+      completedAt: allDone ? new Date().toISOString() : newTaskData.completedAt,
     };
     try {
       await saveTaskToFirestore(newTask);
@@ -116,11 +149,27 @@ export default function App() {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
     const nextState = !task.completed;
+
+    let updatedSubtasks = task.subtasks;
+    if (updatedSubtasks && updatedSubtasks.length > 0) {
+      if (nextState) {
+        updatedSubtasks = updatedSubtasks.map((st) => ({ ...st, completed: true }));
+      } else if (updatedSubtasks.every((st) => st.completed)) {
+        updatedSubtasks = updatedSubtasks.map((st) => ({ ...st, completed: false }));
+      }
+    }
+
     const updatedTask: Task = {
       ...task,
       completed: nextState,
       completedAt: nextState ? new Date().toISOString() : undefined,
+      subtasks: updatedSubtasks,
     };
+
+    if (nextState) {
+      confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+    }
+
     try {
       await saveTaskToFirestore(updatedTask);
     } catch (err) {
@@ -151,8 +200,16 @@ export default function App() {
   };
 
   const handleUpdateTask = async (updatedTask: Task) => {
+    let finalTask = { ...updatedTask };
+    if (finalTask.subtasks && finalTask.subtasks.length > 0) {
+      const allSubtasksDone = finalTask.subtasks.every((s) => s.completed);
+      if (allSubtasksDone && !finalTask.completed) {
+        finalTask.completed = true;
+        finalTask.completedAt = finalTask.completedAt || new Date().toISOString();
+      }
+    }
     try {
-      await saveTaskToFirestore(updatedTask);
+      await saveTaskToFirestore(finalTask);
     } catch (err) {
       console.error('Error updating task:', err);
     }
@@ -193,13 +250,46 @@ export default function App() {
     }
   };
 
-  const handleResetData = async () => {
-    if (window.confirm('Bạn có chắc chắn muốn khôi phục danh sách công việc mẫu ban đầu trong Firebase không?')) {
+  const handleDeleteTagGlobally = async (tagToDelete: string) => {
+    setFilters((prev) => (prev.tag === tagToDelete ? { ...prev, tag: 'all' } : prev));
+
+    const affectedTasks = tasks.filter((t) => t.tags?.includes(tagToDelete));
+    for (const task of affectedTasks) {
+      const updatedTags = (task.tags || []).filter((t) => t !== tagToDelete);
+      const updatedTask: Task = { ...task, tags: updatedTags };
       try {
-        await resetToInitialTasksInFirestore();
+        await saveTaskToFirestore(updatedTask);
       } catch (err) {
-        console.error('Error resetting data:', err);
+        console.error('Error removing tag from task:', err);
       }
+    }
+  };
+
+  const handleRenameTagGlobally = async (oldTag: string, newTag: string) => {
+    setFilters((prev) => (prev.tag === oldTag ? { ...prev, tag: newTag } : prev));
+
+    const affectedTasks = tasks.filter((t) => t.tags?.includes(oldTag));
+    for (const task of affectedTasks) {
+      const updatedTags = (task.tags || []).map((t) => (t === oldTag ? newTag : t));
+      const uniqueTags = Array.from(new Set(updatedTags));
+      const updatedTask: Task = { ...task, tags: uniqueTags };
+      try {
+        await saveTaskToFirestore(updatedTask);
+      } catch (err) {
+        console.error('Error renaming tag in task:', err);
+      }
+    }
+  };
+
+  const handleResetData = () => {
+    setIsResetConfirmOpen(true);
+  };
+
+  const handleConfirmReset = async () => {
+    try {
+      await resetToInitialTasksInFirestore();
+    } catch (err) {
+      console.error('Error resetting data:', err);
     }
   };
 
@@ -278,6 +368,8 @@ export default function App() {
           onCloseMobile={() => setIsMobileSidebarOpen(false)}
           allTags={allTags}
           onOpenQuickAdd={() => setIsQuickAddModalOpen(true)}
+          onOpenTagManager={() => setIsTagManagerOpen(true)}
+          onDeleteTagGlobally={handleDeleteTagGlobally}
         />
 
         {/* Main Content Area */}
@@ -410,6 +502,28 @@ export default function App() {
           onDeleteTask={handleDeleteTask}
         />
       )}
+
+      {/* Tag Manager Modal */}
+      <TagManagerModal
+        isOpen={isTagManagerOpen}
+        onClose={() => setIsTagManagerOpen(false)}
+        allTags={allTags}
+        tasks={tasks}
+        onDeleteTagGlobally={handleDeleteTagGlobally}
+        onRenameTagGlobally={handleRenameTagGlobally}
+      />
+
+      {/* Reset Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isResetConfirmOpen}
+        onClose={() => setIsResetConfirmOpen(false)}
+        onConfirm={handleConfirmReset}
+        title="Khôi phục dữ liệu mẫu"
+        message="Bạn có chắc chắn muốn khôi phục lại danh sách công việc mẫu ban đầu không? Dữ liệu hiện tại sẽ được cập nhật lại."
+        confirmText="Khôi phục"
+        cancelText="Hủy"
+        isDanger={false}
+      />
     </div>
   );
 }
