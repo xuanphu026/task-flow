@@ -1,0 +1,31 @@
+{
+  "schema": {
+    "collections": {
+      "tasks": {
+        "description": "Store all user personal tasks and subtasks",
+        "fields": {
+          "id": { "type": "string", "description": "Unique task ID" },
+          "title": { "type": "string", "description": "Task title" },
+          "description": { "type": "string", "description": "Optional detailed description" },
+          "completed": { "type": "boolean", "description": "Completion status" },
+          "priority": { "type": "string", "description": "Priority level: low | medium | high | urgent" },
+          "category": { "type": "string", "description": "Category ID" },
+          "dueDate": { "type": "string", "description": "Due date in YYYY-MM-DD" },
+          "createdAt": { "type": "string", "description": "ISO timestamp of creation" },
+          "completedAt": { "type": "string", "description": "Optional ISO timestamp when completed" },
+          "subtasks": { "type": "array", "description": "List of subtask items" },
+          "tags": { "type": "array", "description": "List of tag labels" },
+          "isStarred": { "type": "boolean", "description": "Important flag" },
+          "estimatedMinutes": { "type": "number", "description": "Estimated time in minutes" }
+        }
+      }
+    }
+  },
+  "securityRules": [
+    {
+      "collection": "tasks",
+      "read": "true",
+      "write": "true"
+    }
+  ]
+}
