@@ -16,6 +16,7 @@ import confetti from 'canvas-confetti';
 import { CategoryId, Priority, Task } from '../types';
 import { CATEGORIES, PRIORITY_CONFIG } from '../data/categories';
 import { DatePickerInput } from './DatePickerInput';
+import { ConfirmModal } from './ConfirmModal';
 
 interface TaskDetailModalProps {
   task: Task | null;
@@ -38,11 +39,15 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [priority, setPriority] = useState<Priority>(task.priority);
   const [dueDate, setDueDate] = useState(task.dueDate);
   const [isStarred, setIsStarred] = useState(!!task.isStarred);
+  const [isCompleted, setIsCompleted] = useState(
+    task.completed || (task.subtasks && task.subtasks.length > 0 && task.subtasks.every((s) => s.completed))
+  );
   const [estimatedMinutes, setEstimatedMinutes] = useState(task.estimatedMinutes || 30);
   const [subtasks, setSubtasks] = useState(task.subtasks || []);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [tags, setTags] = useState(task.tags || []);
   const [newTagInput, setNewTagInput] = useState('');
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
   const handleToggleSubtask = (subtaskId: string) => {
     const updatedSubtasks = subtasks.map((st) =>
@@ -53,22 +58,34 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     // Auto update task if all subtasks completed
     const allDone = updatedSubtasks.length > 0 && updatedSubtasks.every((s) => s.completed);
     if (allDone) {
-      confetti({ particleCount: 40, spread: 50, origin: { y: 0.7 } });
+      setIsCompleted(true);
+      confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+    } else if (isCompleted && updatedSubtasks.length > 0 && !allDone) {
+      setIsCompleted(false);
     }
   };
 
   const handleAddSubtask = () => {
     if (newSubtaskTitle.trim()) {
-      setSubtasks([
+      const updated = [
         ...subtasks,
         { id: `sub-${Date.now()}-${Math.random()}`, title: newSubtaskTitle.trim(), completed: false },
-      ]);
+      ];
+      setSubtasks(updated);
       setNewSubtaskTitle('');
+      // Adding an incomplete subtask means subtasks are no longer 100%
+      if (isCompleted) {
+        setIsCompleted(false);
+      }
     }
   };
 
   const handleRemoveSubtask = (subtaskId: string) => {
-    setSubtasks(subtasks.filter((st) => st.id !== subtaskId));
+    const updated = subtasks.filter((st) => st.id !== subtaskId);
+    setSubtasks(updated);
+    if (updated.length > 0 && updated.every((s) => s.completed)) {
+      setIsCompleted(true);
+    }
   };
 
   const handleAddTag = () => {
@@ -84,6 +101,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   };
 
   const handleSave = () => {
+    const allDone = subtasks.length > 0 && subtasks.every((s) => s.completed);
+    const finalCompleted = allDone ? true : isCompleted;
+
     onUpdateTask({
       ...task,
       title: title.trim() || task.title,
@@ -95,20 +115,29 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       estimatedMinutes,
       subtasks,
       tags,
+      completed: finalCompleted,
+      completedAt: finalCompleted ? (task.completedAt || new Date().toISOString()) : undefined,
     });
     onClose();
   };
 
   const handleToggleCompleteMain = () => {
-    const nextState = !task.completed;
+    const nextState = !isCompleted;
+    setIsCompleted(nextState);
+
+    let updatedSubtasks = subtasks;
     if (nextState) {
       confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } });
+      if (subtasks.length > 0) {
+        updatedSubtasks = subtasks.map((s) => ({ ...s, completed: true }));
+        setSubtasks(updatedSubtasks);
+      }
+    } else {
+      if (subtasks.length > 0 && subtasks.every((s) => s.completed)) {
+        updatedSubtasks = subtasks.map((s) => ({ ...s, completed: false }));
+        setSubtasks(updatedSubtasks);
+      }
     }
-    onUpdateTask({
-      ...task,
-      completed: nextState,
-      completedAt: nextState ? new Date().toISOString() : undefined,
-    });
   };
 
   return (
@@ -121,17 +150,17 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             <button
               onClick={handleToggleCompleteMain}
               className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${
-                task.completed
+                isCompleted
                   ? 'bg-emerald-500 border-emerald-500 text-white'
                   : 'border-slate-300 dark:border-slate-600 hover:border-blue-500 bg-white dark:bg-slate-800'
               }`}
-              title={task.completed ? 'Đánh dấu chưa hoàn thành' : 'Đánh dấu hoàn thành'}
+              title={isCompleted ? 'Đánh dấu chưa hoàn thành' : 'Đánh dấu hoàn thành'}
             >
-              {task.completed && <Check className="w-4 h-4 stroke-[3]" />}
+              {isCompleted && <Check className="w-4 h-4 stroke-[3]" />}
             </button>
 
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              {task.completed ? 'Công việc đã hoàn thành' : 'Chi tiết công việc'}
+              {isCompleted ? 'Công việc đã hoàn thành' : 'Chi tiết công việc'}
             </span>
           </div>
 
@@ -144,10 +173,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               <Star className={`w-5 h-5 ${isStarred ? 'fill-amber-400 text-amber-400' : ''}`} />
             </button>
             <button
-              onClick={() => {
-                onDeleteTask(task.id);
-                onClose();
-              }}
+              onClick={() => setShowConfirmDelete(true)}
               className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 transition-colors"
               title="Xóa công việc"
             >
@@ -333,8 +359,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs font-medium border border-blue-200 dark:border-blue-800"
                 >
                   #{t}
-                  <button onClick={() => handleRemoveTag(t)}>
-                    <X className="w-3.5 h-3.5 hover:text-rose-500" />
+                  <button type="button" onClick={() => handleRemoveTag(t)} title="Xóa thẻ này">
+                    <X className="w-3.5 h-3.5 hover:text-rose-500 transition-colors" />
                   </button>
                 </span>
               ))}
@@ -382,6 +408,20 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={showConfirmDelete}
+        onClose={() => setShowConfirmDelete(false)}
+        onConfirm={() => {
+          onDeleteTask(task.id);
+          onClose();
+        }}
+        title="Xóa công việc"
+        message={`Bạn có chắc chắn muốn xóa công việc "${task.title}" không? Hành động này không thể hoàn tác.`}
+        confirmText="Xóa"
+        cancelText="Hủy"
+        isDanger={true}
+      />
     </div>
   );
 };

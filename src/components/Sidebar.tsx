@@ -15,9 +15,12 @@ import {
   Filter,
   X,
   Plus,
+  Settings2,
+  Trash2,
 } from 'lucide-react';
 import { CategoryId, FilterStatus, Priority, Task, TaskFilterState } from '../types';
 import { CATEGORIES, PRIORITY_CONFIG } from '../data/categories';
+import { ConfirmModal } from './ConfirmModal';
 
 interface SidebarProps {
   tasks: Task[];
@@ -27,6 +30,8 @@ interface SidebarProps {
   onCloseMobile: () => void;
   allTags: string[];
   onOpenQuickAdd: () => void;
+  onOpenTagManager?: () => void;
+  onDeleteTagGlobally?: (tag: string) => Promise<void>;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -37,6 +42,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
   allTags,
   onOpenQuickAdd,
+  onOpenTagManager,
+  onDeleteTagGlobally,
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -81,6 +88,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'completed', label: 'Đã hoàn thành', icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" />, count: counts.completed },
   ];
 
+  const [showAllTagsInline, setShowAllTagsInline] = React.useState(false);
+  const [tagToDelete, setTagToDelete] = React.useState<string | null>(null);
+
+  const visibleTags = showAllTagsInline || allTags.length <= 10 ? allTags : allTags.slice(0, 10);
+  const hiddenTagsCount = allTags.length - 10;
+
+  const handleQuickDeleteTag = (e: React.MouseEvent, tag: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setTagToDelete(tag);
+  };
   const handleStatusChange = (status: FilterStatus) => {
     setFilters((prev) => ({ ...prev, status }));
     onCloseMobile();
@@ -234,34 +252,75 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {allTags.length > 0 && (
         <div>
           <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-3 mb-2 flex items-center justify-between">
-            <span>Thẻ Nhãn</span>
-            {filters.tag !== 'all' && (
-              <button
-                onClick={() => handleTagChange('all')}
-                className="text-2xs text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                Bỏ lọc
-              </button>
-            )}
+            <span className="flex items-center gap-1.5">
+              Thẻ Nhãn ({allTags.length})
+            </span>
+            <div className="flex items-center gap-2">
+              {onOpenTagManager && (
+                <button
+                  onClick={onOpenTagManager}
+                  className="text-2xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-medium"
+                  title="Quản lý & giải phóng thẻ nhãn"
+                  id="open-tag-manager-btn"
+                >
+                  <Settings2 className="w-3 h-3" />
+                  Quản lý
+                </button>
+              )}
+              {filters.tag !== 'all' && (
+                <button
+                  onClick={() => handleTagChange('all')}
+                  className="text-2xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:underline"
+                >
+                  Bỏ lọc
+                </button>
+              )}
+            </div>
           </div>
+
           <div className="flex flex-wrap gap-1.5 px-2">
-            {allTags.map((tag) => {
+            {visibleTags.map((tag) => {
               const isSelected = filters.tag === tag;
               return (
-                <button
+                <div
                   key={tag}
-                  onClick={() => handleTagChange(tag)}
-                  className={`text-2xs px-2.5 py-1 rounded-lg border transition-all ${
+                  className={`group relative inline-flex items-center text-2xs rounded-lg border transition-all ${
                     isSelected
                       ? 'bg-blue-600 text-white border-blue-600 font-medium'
-                      : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 bg-white/50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
-                  id={`filter-tag-${tag}`}
                 >
-                  #{tag}
-                </button>
+                  <button
+                    onClick={() => handleTagChange(tag)}
+                    className="px-2.5 py-1 text-left"
+                    id={`filter-tag-${tag}`}
+                  >
+                    #{tag}
+                  </button>
+
+                  {onDeleteTagGlobally && (
+                    <button
+                      onClick={(e) => handleQuickDeleteTag(e, tag)}
+                      className={`pr-1.5 pl-0 py-1 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors ${
+                        isSelected ? 'text-blue-100 hover:text-white' : ''
+                      }`}
+                      title={`Xóa thẻ #${tag}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               );
             })}
+
+            {!showAllTagsInline && hiddenTagsCount > 0 && (
+              <button
+                onClick={() => setShowAllTagsInline(true)}
+                className="text-2xs px-2 py-1 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all font-medium"
+              >
+                +{hiddenTagsCount} thẻ khác
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -318,6 +377,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!tagToDelete}
+        onClose={() => setTagToDelete(null)}
+        onConfirm={async () => {
+          if (tagToDelete && onDeleteTagGlobally) {
+            await onDeleteTagGlobally(tagToDelete);
+          }
+        }}
+        title="Xóa thẻ nhãn"
+        message={
+          tagToDelete
+            ? `Bạn có chắc chắn muốn xóa thẻ "#${tagToDelete}" khỏi tất cả công việc không?`
+            : ''
+        }
+        confirmText="Xóa thẻ"
+        cancelText="Hủy"
+        isDanger={true}
+      />
     </>
   );
 };

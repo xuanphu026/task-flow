@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Check,
   Star,
@@ -15,6 +15,7 @@ import confetti from 'canvas-confetti';
 import { Task } from '../types';
 import { CATEGORIES, PRIORITY_CONFIG } from '../data/categories';
 import { formatVietnameseDate } from '../utils/storage';
+import { ConfirmModal } from './ConfirmModal';
 
 interface TaskCardProps {
   task: Task;
@@ -31,6 +32,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onDelete,
   onSelectTask,
 }) => {
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const categoryConfig = CATEGORIES.find((c) => c.id === task.category) || CATEGORIES[0];
   const priorityConfig = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.medium;
 
@@ -219,7 +221,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onDelete(task.id);
+                  setShowConfirmDelete(true);
                 }}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 transition-colors"
                 title="Xóa công việc"
@@ -231,6 +233,17 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={showConfirmDelete}
+        onClose={() => setShowConfirmDelete(false)}
+        onConfirm={() => onDelete(task.id)}
+        title="Xóa công việc"
+        message={`Bạn có chắc chắn muốn xóa công việc "${task.title}" không? Hành động này không thể hoàn tác.`}
+        confirmText="Xóa"
+        cancelText="Hủy"
+        isDanger={true}
+      />
     </div>
   );
 };
