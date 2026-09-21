@@ -16,6 +16,7 @@ import {
   SortOption,
   Priority,
   CategoryId,
+  UserAccount,
 } from './types';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -27,7 +28,9 @@ import { ConfirmModal } from './components/ConfirmModal';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CalendarView } from './components/CalendarView';
 import { AnalyticsView } from './components/AnalyticsView';
+import { AccountingView } from './components/AccountingView';
 import { StatsOverview } from './components/StatsOverview';
+import { LoginScreen } from './components/LoginScreen';
 import {
   CheckCircle2,
   Inbox,
@@ -39,6 +42,15 @@ import {
 } from 'lucide-react';
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
+    try {
+      const saved = localStorage.getItem('taskflow_user_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -59,7 +71,7 @@ export default function App() {
     setIsLoading(true);
     const unsubscribe = subscribeToTasks(
       (updatedTasks) => {
-        // Auto-fix tasks where 100% of subtasks are completed but task.completed is false
+        // Auto-fix tasks where 100% of subtasks are completed but task.completed is false, or vice-versa
         const tasksWithUpdates = updatedTasks.map((t) => {
           if (
             !t.completed &&
@@ -77,6 +89,23 @@ export default function App() {
             );
             return autoCompletedTask;
           }
+
+          if (
+            t.completed &&
+            t.subtasks &&
+            t.subtasks.length > 0 &&
+            t.subtasks.some((st) => !st.completed)
+          ) {
+            const autoFixedSubtasksTask = {
+              ...t,
+              subtasks: t.subtasks.map((st) => ({ ...st, completed: true })),
+            };
+            saveTaskToFirestore(autoFixedSubtasksTask).catch((err) =>
+              console.error('Error syncing subtasks in Firestore:', err)
+            );
+            return autoFixedSubtasksTask;
+          }
+
           return t;
         });
 
@@ -224,7 +253,16 @@ export default function App() {
 
     let updatedTask: Task = { ...task };
     if (targetColumn === 'done') {
-      updatedTask = { ...task, completed: true, completedAt: new Date().toISOString() };
+      const updatedSubtasks =
+        task.subtasks && task.subtasks.length > 0
+          ? task.subtasks.map((s) => ({ ...s, completed: true }))
+          : [];
+      updatedTask = {
+        ...task,
+        completed: true,
+        completedAt: new Date().toISOString(),
+        subtasks: updatedSubtasks,
+      };
     } else if (targetColumn === 'inProgress') {
       const existingSubtasks = task.subtasks && task.subtasks.length > 0 ? task.subtasks : [
         { id: `sub-auto-1`, title: 'Bước đầu tiên', completed: true },
@@ -342,6 +380,35 @@ export default function App() {
     });
   }, [tasks, filters]);
 
+  const handleLoginSuccess = (user: UserAccount) => {
+    setCurrentUser(user);
+    try {
+      localStorage.setItem('taskflow_user_session', JSON.stringify(user));
+    } catch (e) {
+      console.error('Failed to save session:', e);
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    try {
+      localStorage.removeItem('taskflow_user_session');
+    } catch (e) {
+      console.error('Failed to remove session:', e);
+    }
+  };
+
+  // If user is not logged in, show Login Screen
+  if (!currentUser) {
+    return (
+      <LoginScreen
+        onLoginSuccess={handleLoginSuccess}
+        isDarkMode={isDarkMode}
+        toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200">
       {/* Header */}
@@ -355,25 +422,31 @@ export default function App() {
         onOpenQuickAdd={() => setIsQuickAddModalOpen(true)}
         onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         onResetData={handleResetData}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* Main Container */}
       <div className="max-w-7xl mx-auto flex">
-        {/* Sidebar */}
-        <Sidebar
-          tasks={tasks}
-          filters={filters}
-          setFilters={setFilters}
-          isOpenMobile={isMobileSidebarOpen}
-          onCloseMobile={() => setIsMobileSidebarOpen(false)}
-          allTags={allTags}
-          onOpenQuickAdd={() => setIsQuickAddModalOpen(true)}
-          onOpenTagManager={() => setIsTagManagerOpen(true)}
-          onDeleteTagGlobally={handleDeleteTagGlobally}
-        />
+        {/* Sidebar (shown on task-oriented view modes) */}
+        {viewMode !== 'accounting' && (
+          <Sidebar
+            tasks={tasks}
+            filters={filters}
+            setFilters={setFilters}
+            isOpenMobile={isMobileSidebarOpen}
+            onCloseMobile={() => setIsMobileSidebarOpen(false)}
+            allTags={allTags}
+            onOpenQuickAdd={() => setIsQuickAddModalOpen(true)}
+            onOpenTagManager={() => setIsTagManagerOpen(true)}
+            onDeleteTagGlobally={handleDeleteTagGlobally}
+            viewMode={viewMode}
+            onSelectViewMode={setViewMode}
+          />
+        )}
 
         {/* Main Content Area */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0">
+        <main className={`flex-1 min-w-0 ${viewMode === 'accounting' ? 'p-2 sm:p-4' : 'p-4 sm:p-6 lg:p-8'}`}>
           {/* List View */}
           {viewMode === 'list' && (
             <div className="max-w-4xl mx-auto space-y-6">
@@ -480,6 +553,11 @@ export default function App() {
           {/* Analytics View */}
           {viewMode === 'analytics' && (
             <AnalyticsView stats={stats} tasks={tasks} />
+          )}
+
+          {/* Accounting & Payroll View */}
+          {viewMode === 'accounting' && (
+            <AccountingView />
           )}
         </main>
       </div>
