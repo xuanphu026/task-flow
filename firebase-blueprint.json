@@ -18,12 +18,30 @@
           "isStarred": { "type": "boolean", "description": "Important flag" },
           "estimatedMinutes": { "type": "number", "description": "Estimated time in minutes" }
         }
+      },
+      "users": {
+        "description": "Store registered user accounts for login authentication and profile information",
+        "fields": {
+          "id": { "type": "string", "description": "Unique user ID or username" },
+          "username": { "type": "string", "description": "Unique username used for login" },
+          "password": { "type": "string", "description": "User password" },
+          "fullName": { "type": "string", "description": "Full display name of user" },
+          "email": { "type": "string", "description": "Optional email address" },
+          "role": { "type": "string", "description": "Role: admin | member" },
+          "avatar": { "type": "string", "description": "User avatar initials or image URL" },
+          "createdAt": { "type": "string", "description": "ISO timestamp of account creation" }
+        }
       }
     }
   },
   "securityRules": [
     {
       "collection": "tasks",
+      "read": "true",
+      "write": "true"
+    },
+    {
+      "collection": "users",
       "read": "true",
       "write": "true"
     }

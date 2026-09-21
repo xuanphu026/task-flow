@@ -1,6 +1,6 @@
 {
   "name": "TaskFlow - Quản Lý Công Việc Cá Nhân",
-  "description": "Ứng dụng quản lý công việc cá nhân hiện đại với giao diện trực quan, phân loại danh mục, mức độ ưu tiên, tiến độ và thống kê hiệu suất.",
+  "description": "Ứng dụng quản lý công việc, phân hệ kế toán tài chính, tính lương Gross/Net, quản lý sổ quỹ, khấu hao tài sản cố định và phân tích điểm hòa vốn doanh nghiệp.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
