@@ -42,7 +42,14 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
   const subtasksCount = task.subtasks?.length || 0;
   const subtasksCompleted = task.subtasks?.filter((s) => s.completed).length || 0;
-  const subtaskProgress = subtasksCount > 0 ? Math.round((subtasksCompleted / subtasksCount) * 100) : 0;
+  const displaySubtasksCompleted =
+    task.completed && subtasksCount > 0 ? subtasksCount : subtasksCompleted;
+  const subtaskProgress =
+    subtasksCount > 0
+      ? task.completed
+        ? 100
+        : Math.round((displaySubtasksCompleted / subtasksCount) * 100)
+      : 0;
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -153,13 +160,15 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               <div className="flex items-center justify-between text-2xs text-slate-500 dark:text-slate-400 mb-1">
                 <span className="flex items-center gap-1 font-medium">
                   <CheckSquare className="w-3 h-3 text-blue-500" />
-                  Công việc con ({subtasksCompleted}/{subtasksCount})
+                  Công việc con ({displaySubtasksCompleted}/{subtasksCount})
                 </span>
-                <span>{subtaskProgress}%</span>
+                <span className="font-semibold text-slate-600 dark:text-slate-300">{subtaskProgress}%</span>
               </div>
               <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
                 <div
-                  className="bg-blue-500 h-full transition-all duration-300"
+                  className={`h-full transition-all duration-300 ${
+                    task.completed || subtaskProgress === 100 ? 'bg-emerald-500' : 'bg-blue-500'
+                  }`}
                   style={{ width: `${subtaskProgress}%` }}
                 />
               </div>

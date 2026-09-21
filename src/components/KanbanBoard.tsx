@@ -8,6 +8,8 @@ import {
   Calendar,
   AlertCircle,
   MoreHorizontal,
+  Check,
+  CheckSquare,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Task } from '../types';
@@ -56,6 +58,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
     const subtasksCount = task.subtasks?.length || 0;
     const subtasksCompleted = task.subtasks?.filter((s) => s.completed).length || 0;
+    const displaySubtasksCompleted =
+      task.completed && subtasksCount > 0 ? subtasksCount : subtasksCompleted;
+    const subtaskProgress =
+      subtasksCount > 0
+        ? task.completed
+          ? 100
+          : Math.round((displaySubtasksCompleted / subtasksCount) * 100)
+        : 0;
 
     return (
       <div
@@ -91,22 +101,53 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           </div>
         </div>
 
-        {/* Title */}
-        <h4
-          className={`text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1.5 ${
-            task.completed ? 'line-through text-slate-400' : ''
-          }`}
-        >
-          {task.title}
-        </h4>
+        {/* Title with completion checkbox */}
+        <div className="flex items-start gap-2 mb-1.5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!task.completed) {
+                confetti({ particleCount: 40, spread: 50, origin: { y: 0.7 } });
+              }
+              onToggleComplete(task.id);
+            }}
+            className={`shrink-0 mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
+              task.completed
+                ? 'bg-emerald-500 border-emerald-500 text-white'
+                : 'border-slate-300 dark:border-slate-600 hover:border-blue-500 bg-white dark:bg-slate-800'
+            }`}
+            title={task.completed ? 'Đánh dấu chưa hoàn thành' : 'Đánh dấu hoàn thành'}
+          >
+            {task.completed && <Check className="w-3 h-3 stroke-[3]" />}
+          </button>
+          <h4
+            className={`text-sm font-semibold text-slate-900 dark:text-slate-100 ${
+              task.completed ? 'line-through text-slate-400 dark:text-slate-500' : ''
+            }`}
+          >
+            {task.title}
+          </h4>
+        </div>
 
-        {/* Subtask count */}
+        {/* Subtask progress bar */}
         {subtasksCount > 0 && (
-          <div className="text-2xs text-slate-500 mb-2 flex items-center gap-1">
-            <Clock className="w-3 h-3 text-blue-500" />
-            <span>
-              Bước con: {subtasksCompleted}/{subtasksCount}
-            </span>
+          <div className="my-2">
+            <div className="flex items-center justify-between text-2xs text-slate-500 dark:text-slate-400 mb-1">
+              <span className="flex items-center gap-1 font-medium">
+                <CheckSquare className="w-3 h-3 text-blue-500 shrink-0" />
+                Công việc con ({displaySubtasksCompleted}/{subtasksCount})
+              </span>
+              <span className="font-semibold text-slate-600 dark:text-slate-300">{subtaskProgress}%</span>
+            </div>
+            <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-300 ${
+                  task.completed || subtaskProgress === 100 ? 'bg-emerald-500' : 'bg-blue-500'
+                }`}
+                style={{ width: `${subtaskProgress}%` }}
+              />
+            </div>
           </div>
         )}
 

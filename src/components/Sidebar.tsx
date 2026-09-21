@@ -17,8 +17,9 @@ import {
   Plus,
   Settings2,
   Trash2,
+  Calculator,
 } from 'lucide-react';
-import { CategoryId, FilterStatus, Priority, Task, TaskFilterState } from '../types';
+import { CategoryId, FilterStatus, Priority, Task, TaskFilterState, ViewMode } from '../types';
 import { CATEGORIES, PRIORITY_CONFIG } from '../data/categories';
 import { ConfirmModal } from './ConfirmModal';
 
@@ -32,6 +33,8 @@ interface SidebarProps {
   onOpenQuickAdd: () => void;
   onOpenTagManager?: () => void;
   onDeleteTagGlobally?: (tag: string) => Promise<void>;
+  viewMode?: ViewMode;
+  onSelectViewMode?: (mode: ViewMode) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -44,6 +47,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenQuickAdd,
   onOpenTagManager,
   onDeleteTagGlobally,
+  viewMode,
+  onSelectViewMode,
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -322,6 +327,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Enterprise Module: Kế toán & Tính lương */}
+      {onSelectViewMode && (
+        <div className="pt-3 border-t border-slate-200/80 dark:border-slate-800">
+          <span className="text-2xs font-bold uppercase tracking-wider text-slate-400 px-3 block mb-2">
+            Quản trị Doanh Nghiệp
+          </span>
+          <button
+            onClick={() => {
+              onSelectViewMode('accounting');
+              if (onCloseMobile) onCloseMobile();
+            }}
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              viewMode === 'accounting'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Calculator className={`w-4 h-4 ${viewMode === 'accounting' ? 'text-white' : 'text-blue-500'}`} />
+              <span>Kế toán & Tính lương</span>
+            </div>
+            <span
+              className={`text-2xs px-1.5 py-0.5 rounded font-bold ${
+                viewMode === 'accounting'
+                  ? 'bg-blue-700 text-white'
+                  : 'bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300'
+              }`}
+            >
+              PRO
+            </span>
+          </button>
         </div>
       )}
 

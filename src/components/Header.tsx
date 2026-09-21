@@ -12,8 +12,11 @@ import {
   Plus,
   X,
   RotateCcw,
+  LogOut,
+  User,
+  Calculator,
 } from 'lucide-react';
-import { ViewMode } from '../types';
+import { ViewMode, UserAccount } from '../types';
 
 interface HeaderProps {
   viewMode: ViewMode;
@@ -25,6 +28,8 @@ interface HeaderProps {
   onOpenQuickAdd: () => void;
   onToggleMobileSidebar: () => void;
   onResetData: () => void;
+  currentUser?: UserAccount | null;
+  onLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -37,6 +42,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenQuickAdd,
   onToggleMobileSidebar,
   onResetData,
+  currentUser,
+  onLogout,
 }) => {
   return (
     <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
@@ -145,6 +152,19 @@ export const Header: React.FC<HeaderProps> = ({
               <BarChart3 className="w-3.5 h-3.5" />
               Thống kê
             </button>
+
+            <button
+              onClick={() => setViewMode('accounting')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                viewMode === 'accounting'
+                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-semibold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+              id="view-mode-accounting-btn"
+            >
+              <Calculator className="w-3.5 h-3.5 text-indigo-500" />
+              Kế toán & Lương
+            </button>
           </div>
 
           {/* Action Buttons */}
@@ -175,6 +195,34 @@ export const Header: React.FC<HeaderProps> = ({
               <Plus className="w-4 h-4" />
               <span className="hidden xs:inline">Tạo việc mới</span>
             </button>
+
+            {/* User Profile & Logout */}
+            {currentUser && (
+              <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
+                <div
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/60"
+                  title={`Đang đăng nhập: ${currentUser.fullName} (@${currentUser.username})`}
+                >
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-500 text-white font-bold text-2xs flex items-center justify-center">
+                    {currentUser.avatar || currentUser.username.slice(0, 2).toUpperCase()}
+                  </div>
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 hidden md:inline max-w-[100px] truncate">
+                    {currentUser.fullName || currentUser.username}
+                  </span>
+                </div>
+
+                {onLogout && (
+                  <button
+                    onClick={onLogout}
+                    className="p-2 rounded-xl text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                    title="Đăng xuất khỏi hệ thống"
+                    id="logout-header-btn"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -219,6 +267,16 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <BarChart3 className="w-3.5 h-3.5" /> Thống kê
+          </button>
+          <button
+            onClick={() => setViewMode('accounting')}
+            className={`flex items-center gap-1 text-xs py-1 px-2.5 rounded-lg font-medium whitespace-nowrap ${
+              viewMode === 'accounting'
+                ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 font-semibold'
+                : 'text-slate-600 dark:text-slate-400'
+            }`}
+          >
+            <Calculator className="w-3.5 h-3.5 text-indigo-500" /> Kế toán
           </button>
         </div>
       </div>

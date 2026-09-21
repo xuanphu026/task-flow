@@ -157,14 +157,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onSelectTask 
               </div>
 
               {/* Tasks List snippet */}
-              <div className="space-y-1 overflow-y-auto max-h-[70px] custom-scrollbar">
+              <div className="space-y-1 overflow-y-auto overflow-x-hidden max-h-[70px]">
                 {dayTasks.map((t) => {
                   const cat = CATEGORIES.find((c) => c.id === t.category) || CATEGORIES[0];
                   return (
                     <div
                       key={t.id}
                       onClick={() => onSelectTask(t)}
-                      className={`text-2xs p-1 rounded-md font-medium truncate cursor-pointer transition-transform hover:scale-[1.02] flex items-center gap-1 ${cat.bgColor} ${cat.textColor}`}
+                      className={`text-2xs p-1 rounded-md font-medium truncate cursor-pointer transition-colors hover:brightness-95 dark:hover:brightness-110 active:opacity-80 flex items-center gap-1 ${cat.bgColor} ${cat.textColor}`}
                       title={t.title}
                     >
                       {t.completed && <Check className="w-2.5 h-2.5 shrink-0" />}
